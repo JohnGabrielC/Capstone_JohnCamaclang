@@ -30,7 +30,7 @@ class Detector:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         if self.res.pose_landmarks:
             if draw:
-                self.mp_draw.draw_landmarks(image = img, landmark_list = self.larndmark_subset)
+                self.mp_draw.draw_landmarks(img, self.res.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
         return img
 
     def detect_sitting(self, img):
