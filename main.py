@@ -1,6 +1,7 @@
 from detector import Detector
 import cv2
 import mediapipe as mp
+from mediapipe.framework.formats import landmark_mp2
 
 def main():
     cap = cv2.VideoCapture(0)
