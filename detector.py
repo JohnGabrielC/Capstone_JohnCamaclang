@@ -1,5 +1,10 @@
 import cv2
+from cv2 import FONT_HERSHEY_COMPLEX
 import mediapipe as mp
+import numpy as np
+import os
+import pathlib
+
 class Detector:
     def __init__(self, static_mode = False, model_complex = 1, smooth_landmark = True, segmentation = False,
     smooth_segment = False, min_detect_conf = 0.7, min_track_conf = 0.7):
@@ -34,62 +39,78 @@ class Detector:
         )
 
         
-
-
-    def get_pose(self, img, draw = True):
-        # #Imported this just to remove certain landmarks
-        # from mediapipe.framework.formats import landmark_pb2
-
-        #Convert image from RGB to BGR for vision uses
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        self.res = self.pose.process(img)
-        self.landmarks = self.res.pose_landmarks
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        #Landmarks
-        self.pose_connections = self.mp_pose.POSE_CONNECTIONS
-
-        #Only display the shoulders and part of the arms
-        # self.landmark_subset = landmark_pb2.NormalizedLandmarkList(
-        #     landmark = [
-        #         self.landmarks.landmark[11],
-        #         self.landmarks.landmark[12],
-        #         self.landmarks.landmark[13],
-        #         self.landmarks.landmark[14]
-        #     ]
-        # )
-
-
-        if self.landmarks:
-            if draw:
-
-                #Draws only the shoulders and part of the arms
-                #TODO: Figure out how to draw the lines back in without error                
-                # self.mp_draw.draw_landmarks(img, 
-                #     self.landmark_subset, 
-                #     # self.pose_connections,
+    def get_pose(self, draw = True, win_h = 640, win_w = 480):
+        count = 0
+        cap = cv2.VideoCapture(0)
+        with self.pose:
+            while cap.isOpened():
+                succ, img = cap.read()
                 
-                #     landmark_drawing_spec= self.mp_drawing_styles.get_default_pose_landmarks_style())
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                # img.flags.writeable = False
+
+                res = self.pose.process(img)
+
+                # img.flags.writeable = True
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+                pose_connections = self.mp_pose.POSE_CONNECTIONS
+                landmark_pos = res.pose_landmarks
+                landmarks = landmark_pos.landmark
+
+                left_shoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+                right_shoulder = [landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+                try:
+                    cv2.putText(img, str(left_shoulder), 
+                        tuple(np.multiply(left_shoulder, [win_h, win_w]).astype(int)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255,255,255), 1, cv2.LINE_AA
+                        )
+        
+                    cv2.putText(img, str(right_shoulder), 
+                        tuple(np.multiply(right_shoulder, [win_h, win_w]).astype(int)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255,255,255), 1, cv2.LINE_AA
+                        )               
+                except:
+                    pass
+
                 self.mp_draw.draw_landmarks(img, 
-                self.landmarks, 
-                self.pose_connections,
-                self.mp_draw.DrawingSpec(color = (0, 255, 255), thickness = 4, circle_radius = 4),
-                self.mp_draw.DrawingSpec(color = (0, 0, 255), thickness = 4, circle_radius = 4))
-                
-                #Backup line
-                # self.mp_draw.draw_landmarks(img, 
-                #     self.landmarks, 
-                #     self.pose_connections,
-                #     landmark_drawing_spec= self.mp_drawing_styles.get_default_pose_landmarks_style())
+                    landmark_pos, 
+                    pose_connections,
+                    landmark_drawing_spec= self.mp_drawing_styles.get_default_pose_landmarks_style())
 
+                cv2.imshow('', img)
 
-        return img
+                if cv2.waitKey(5) & 0xFF == 27:
+                    break
+                #Check if key is either spacebar or esc
+                a = cv2.waitKey(5)
 
-    def calculate_landmarks(self, img):
-        #TODO: Understand how to calculate and compare the two shoulders
-        pass
+                if a % 256 == 32:
+                    self.save_image(count, img)
+                    count += 1
 
+            cap.release()
+            cv2.destroyAllWindows
+
+    def save_image(self, counter, img):
+        path = os.path.dirname(os.path.abspath(__file__)) #Set this to this folder
+        cv2.imwrite(os.path.join(path, "frame_%d.jpg" % counter), img)
+        print("frame_%d" % counter + " saved")
+
+    
     def detect_sitting(self, img):
         #TODO: Create model that could be used to compare sitting position/posture
         pass
-    
+
+
+    #TODO: Find walking data for gait analysis
+
+    #TODO: Posture detection and figure out what points are important for detection
+
+    #TODO: importance and impact of this work. What health problems can be detected and can be fixed 
+
+    #TODO scoliosis problem 
+
+if __name__ =='main':
+    d = Detector()
+    d.get_pose()
