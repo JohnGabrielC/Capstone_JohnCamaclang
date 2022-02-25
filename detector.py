@@ -3,7 +3,8 @@ from cv2 import FONT_HERSHEY_COMPLEX
 import mediapipe as mp
 import numpy as np
 import os
-import pathlib
+import pandas as pd
+
 
 class Detector:
     def __init__(self, static_mode = False, model_complex = 1, smooth_landmark = True, segmentation = False,
@@ -15,6 +16,9 @@ class Detector:
         self.smooth_segment = smooth_segment
         self.min_detect_conf = min_detect_conf
         self.min_track_conf = min_track_conf
+        self.data = []
+        self.pose_tub = ['LEFT_SHOULDER', 'RIGHT_SHOULDER', 'LEFT_ELBOW', 'RIGHT_ELBOW']
+        self.timer = 0
 
         """
         Args:
@@ -53,6 +57,8 @@ class Detector:
 
                 # img.flags.writeable = True
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img_copy = np.copy(img)
+                img = np.zeros(img.shape)
 
                 pose_connections = self.mp_pose.POSE_CONNECTIONS
                 landmark_pos = res.pose_landmarks
@@ -61,6 +67,7 @@ class Detector:
                 left_shoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
                 right_shoulder = [landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
                 try:
+
                     cv2.putText(img, str(left_shoulder), 
                         tuple(np.multiply(left_shoulder, [win_h, win_w]).astype(int)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255,255,255), 1, cv2.LINE_AA
@@ -72,15 +79,38 @@ class Detector:
                         )               
                 except:
                     pass
+                
+                if landmark_pos:
+                    if(len(self.data) == 1):
+                        pass
+                    else:
+                        data_tub = {} 
+
+                        for i in range(len(self.pose_tub)):
+                            if landmarks[i].x is None or landmarks[i].y is None:
+                                landmarks[i].x = None
+                                landmarks[i].y = None
+                                data_tub.update({self.pose_tub[i]: landmarks[i]})
+                            else:
+                                landmarks[i].x = landmarks[i].x
+                                landmarks[i].y = landmarks[i].y 
+                                data_tub.update({self.pose_tub[i]: landmarks[i]})
+                            
+                        self.data.append(data_tub)
+
 
                 self.mp_draw.draw_landmarks(img, 
                     landmark_pos, 
                     pose_connections,
                     landmark_drawing_spec= self.mp_drawing_styles.get_default_pose_landmarks_style())
 
-                cv2.imshow('', img)
-
+                cv2.imshow('Pose Outline', img)
+                cv2.imshow('', img_copy)
+                # self.timer += 1
                 if cv2.waitKey(5) & 0xFF == 27:
+                    df = pd.DataFrame(self.data)
+                    output = "coord.csv"
+                    df.to_csv(output, mode = "a", header = not os.path.exists(output))
                     break
                 #Check if key is either spacebar or esc
                 a = cv2.waitKey(5)
@@ -110,7 +140,3 @@ class Detector:
     #TODO: importance and impact of this work. What health problems can be detected and can be fixed 
 
     #TODO scoliosis problem 
-
-if __name__ =='main':
-    d = Detector()
-    d.get_pose()
